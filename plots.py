@@ -2,15 +2,21 @@ import duckdb
 import pandas as pd
 import plotly.express as px
 
-# Connect to DuckDB and load data
+# load data from duckDB
 con = duckdb.connect("wiki.db")
-df = con.execute("SELECT * FROM wikipedia_events").fetchdf()
+df = con.execute("SELECT * FROM wikipedia_events").fetch_df()
+con.close()
 
-# Convert timestamp to datetime
-df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
-df['hour'] = df['datetime'].dt.hour
+# language plot
+lang_counts = (
+    df.groupby("wiki")
+      .size()
+      .reset_index(name="Number of Edits")
+      .sort_values("Number of Edits", ascending=False)
+      .head(30)
+)
 
-# Map wiki codes to languages
+# making the languages more readable
 wiki_mapping = {
     "enwiki": "English",
     "frwiki": "French",
@@ -66,62 +72,50 @@ wiki_mapping = {
     "mrwiki": "Marathi",
     "urwiki": "Urdu",
     "incubatorwiki": "Incubator",
-    "eswiktionary": "Spanish Wiktionary"
+    "eswiktionary": "Spanish Wiktionary",
+    "metawiki": "Meta-Wiki",
+    "mgwiktionary": "Malagasy Wiktionary",
+    "ruwikinews": "Russian Wikinews"
 }
 
-df['language_name'] = df['wiki'].map(wiki_mapping).fillna(df['wiki'])
-
-# Interactive Bar Chart: Edits by Language
-lang_counts = df['language_name'].value_counts().reset_index()
-lang_counts.columns = ['Language', 'Number of Edits']
-
+lang_counts["Language"] = lang_counts["wiki"].map(wiki_mapping).fillna(lang_counts["wiki"])
 
 fig_lang = px.bar(
     lang_counts,
-    x='Language',
-    y='Number of Edits',
-    title='Edits by Language',
-    hover_data={'Language': True, 'Number of Edits': True},
+    x="Language",
+    y="Number of Edits",
+    title="Edits by Language",
 )
-fig_lang.update_layout(xaxis_title='Language', yaxis_title='Number of Edits')
+
+fig_lang.update_layout(xaxis_title="Language", yaxis_title="Number of Edits")
+
+# Save to file
+fig_lang.write_image("language_plot.png", scale=3)
+print("Saved: language_plot.png")
+
 fig_lang.show()
 
-# Interactive Bar Chart: Edits by Change Type
-type_counts = df['type'].value_counts().reset_index()
-type_counts.columns = ['Change Type', 'Number of Edits']
+# type of edit plot
+type_counts = (
+    df.groupby("type")
+      .size()
+      .reset_index(name="Number of Edits")
+      .sort_values("Number of Edits", ascending=False)
+)
 
 fig_type = px.bar(
     type_counts,
-    x='Change Type',
-    y='Number of Edits',
-    title='Edits by Change Type',
-    hover_data={'Change Type': True, 'Number of Edits': True},
+    x="type",
+    y="Number of Edits",
+    title="Edits by Change Type",
 )
-fig_type.update_layout(xaxis_title='Change Type', yaxis_title='Number of Edits')
+
+fig_type.update_layout(xaxis_title="Change Type", yaxis_title="Number of Edits")
+
+# Save to file
+fig_type.write_image("type_plot.png", scale=3)
+print("Saved: type_plot.png")
+
 fig_type.show()
 
-# Interactive Line Chart: Edits by Hour of Day
-
-# Convert timestamp column to datetime in UTC
-df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s', utc=True)
-df = df.dropna(subset=['timestamp'])
-
-# Create proper hour bins
-df['hour'] = df['timestamp'].dt.hour
-
-hour_counts = df.groupby('hour').size().reset_index(name='Number of Edits')
-# group by actual timeline hours
-
-
-fig_hour = px.line(
-    hour_counts,
-    x='hour',
-    y='Number of Edits',
-    title='Edits by Hour (UTC)',
-    markers=True,
-    hover_data={'hour': True, 'Number of Edits': True}
-)
-
-fig_hour.update_layout(xaxis_title='Hour (UTC)', yaxis_title='Number of Edits')
-fig_hour.show()
 
